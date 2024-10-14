@@ -5,7 +5,7 @@ import logging
 class ContextualEmbeddings:
     def __init__(self, model_name: str = "llama3.1"):
         self.model_name = model_name
-        self.api_url = f"http://localhost:11434/api/embeddings"
+        self.api_url = f"http://127.0.0.1:11434/api/embeddings"
         self.logger = logging.getLogger(__name__)
 
     def generate_embeddings(self, texts: List[str], context: str) -> List[list[float]]:

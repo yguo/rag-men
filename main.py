@@ -2,20 +2,50 @@ import sys
 import argparse
 from src.pipeline.pipeline import ContextualRAGPipeline
 
+import PyPDF2
+
 def load_file_content(file_path):
     try:
-        with open(file_path, 'r', encoding='utf-8') as file:
-            return file.read()
+        if file_path.lower().endswith('.pdf'):
+            with open(file_path, 'rb') as file:
+                pdf_reader = PyPDF2.PdfReader(file)
+                content = ""
+                for page in pdf_reader.pages:
+                    content += page.extract_text() + "\n"
+                # Extract metadata
+                metadata = {
+                    "file_name": file_path.split("/")[-1],
+                    "num_pages": len(pdf_reader.pages),
+                    "author": pdf_reader.metadata.author if pdf_reader.metadata.author else "Unknown",
+                    "creation_date": pdf_reader.metadata.creation_date.strftime('%Y-%m-%d') if pdf_reader.metadata.creation_date else "Unknown",
+                    "modification_date": pdf_reader.metadata.modification_date.strftime('%Y-%m-%d') if pdf_reader.metadata.modification_date else "Unknown",
+                    "producer": pdf_reader.metadata.producer if pdf_reader.metadata.producer else "Unknown",
+                    "subject": pdf_reader.metadata.subject if pdf_reader.metadata.subject else "Unknown",
+                    "title": pdf_reader.metadata.title if pdf_reader.metadata.title else "Unknown",
+                }
+                
+                return content, metadata            
+        else:
+            with open(file_path, 'r', encoding='utf-8') as file:
+                content = file.read()
+                metadata = {
+                    "file_name": file_path.split("/")[-1],
+                    "file_type": "text"
+                }
+                return content, metadata
     except IOError as e:
         print(f"Error reading file: {e}")
+        return None
+    except PyPDF2.errors.PdfReadError as e:
+        print(f"Error reading PDF file: {e}")
         return None
 
 def list_knowledge_base(pipeline):
     all_docs = pipeline.vector_store.get_all_documents()
-    if not all_docs['ids']:
+    if not all_docs:
         print("The knowledge base is empty.")
     else:
-        print("Knowledge Base Contents:")
+        print(f"Knowledge Base Contents: {all_docs}")
         for i, (doc_id, text) in enumerate(zip(all_docs['ids'], all_docs['documents']), 1):
             print(f"{i}. ID: {doc_id}")
             print(f"   Content: {text[:100]}...")  # Display first 100 characters
@@ -34,7 +64,7 @@ def main():
 
     while True:
         print("\nOptions:")
-        print("1. Upload a file")
+        print("1. Upload a file (PDF or utf-8 text only): ")
         print("2. Enter a query")
         print("3. List knowledge base")
         print("4. Exit")
@@ -43,9 +73,9 @@ def main():
         
         if choice == '1':
             file_path = input("Enter the path to the file you want to upload: ").strip()
-            file_content = load_file_content(file_path)
-            if file_content:
-                pipeline.add_document(file_content)
+            file_content, metadata = load_file_content(file_path)
+            if file_content and metadata:
+                pipeline.add_document(file_content, metadata)
                 print("File content added to local knowledge base.")
             else:
                 print("Failed to load file content.")

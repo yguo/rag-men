@@ -15,10 +15,19 @@ class ContextualRAGPipeline:
         self.vector_store = VectorStore()
         self.answer_generator = AnswerGenerator()
 
-    def add_document(self, text: str):
-        embedding = self.contextual_embeddings.generate_embeddings([text], "")[0]
-        self.vector_store.add_documents([text], [embedding])
-        self.contextual_bm25.add_documents([text])
+    def add_document(self, text: str,metadata):
+        try:
+            embedding = self.contextual_embeddings.generate_embeddings([text], "")[0]
+            if not embedding:
+                print("Error: No embedding generated to add document. The embedding service might be unavailable.")
+                return False
+            # add more metadata 
+            metadata["content_summary"] = text[:100] #placeholder for now
+
+            self.vector_store.add_documents([text], [embedding], metadata)
+            self.contextual_bm25.add_documents([text])
+        except Exception as e:
+            print(f"Error adding document: {e}")
 
     def process_query(self, query: str) -> Dict:
         # Step 1: Retrieve relevant local documents

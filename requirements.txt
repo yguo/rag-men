@@ -5,4 +5,5 @@ pytest==8.3.3
 chromadb==0.5.13
 ollama == 0.3.3
 duckduckgo_search == 6.3.0
-
+nltk == 3.9.1
+PyPDF2 == 3.0.1
