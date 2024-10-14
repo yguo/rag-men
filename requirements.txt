@@ -2,3 +2,7 @@ iniconfig==2.0.0
 packaging==24.1
 pluggy==1.5.0
 pytest==8.3.3
+chromadb==0.5.13
+ollama == 0.3.3
+duckduckgo_search == 6.3.0
+
