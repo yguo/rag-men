@@ -2,7 +2,7 @@ from typing import List, Dict
 import ollama
 from ollama._types import ResponseError
 class Reranker:
-    def __init__(self, model_name: str = "llama3.1"):
+    def __init__(self, model_name: str = "llama2"):
         self.model = model_name
 
     def rerank(self, query: str, context: str, results: List[Dict]) -> List[Dict]:
@@ -27,7 +27,7 @@ class Reranker:
             except ResponseError as e:
                 print(f"Ollama ResponseError: {e}")
                 print(f"Status code: {e.status_code}")
-                print(f"Response text: {e.message}")
+                print(f"Response text: {e.error}")
                 # Assign a default score or skip this result
                 result['relevance_score'] = 0  # or you could skip appending this result
                 reranked_results.append(result)
