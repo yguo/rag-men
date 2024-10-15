@@ -21,7 +21,14 @@ class ContextualRAGPipeline:
     
     def add_document_chunk(self, chunk: str, metadata: Dict):
         try:
-            embedding = self.contextual_embeddings.generate_embeddings([chunk], "")[0]
+             # Generate a context summary from the metadata
+            context = f"Title: {metadata.get('title', 'Unknown')}\n"
+            context += f"Author: {metadata.get('author', 'Unknown')}\n"
+            context += f"Subject: {metadata.get('subject', 'Unknown')}\n"
+            context += f"Chunk {metadata.get('chunk_index', 0)} of {metadata.get('total_chunks', 1)}\n"
+
+            embedding = self.contextual_embeddings.generate_embeddings([chunk], context)[0]
+                   
             if not embedding:
                 print("Error: No embedding generated to add document. The embedding service might be unavailable.")
                 return False
@@ -31,7 +38,16 @@ class ContextualRAGPipeline:
             chunk_metadata["is_chunk"] = True
             chunk_metadata["chunk_index"] = metadata.get("chunk_index", 0) 
 
-            self.vector_store.add_documents([chunk], [embedding], [chunk_metadata])
+            # Generate a unique ID for the chunk
+            chunk_id = f"doc_{metadata.get('file_name', 'unknown')}_{metadata.get('chunk_index', 0)}"
+             # Check if the document already exists
+            existing_doc = self.vector_store.get_document_by_id(chunk_id)
+            if existing_doc:
+                print(f"Document with ID {chunk_id} already exists. Updating...")
+                self.vector_store.update_document(chunk_id, chunk, embedding, chunk_metadata)
+            else:
+                self.vector_store.add_documents([chunk], [embedding], [chunk_metadata], [chunk_id])
+
             self.contextual_bm25.add_documents([chunk])
             return True
         except Exception as e:
@@ -64,6 +80,11 @@ class ContextualRAGPipeline:
 
         # Step 3: Combine local and web results and initialize scores
         all_texts = local_texts + web_texts
+        if not all_texts:
+            return {
+                "answer": "I'm sorry, but I couldn't find any relevant information to answer your query.",
+                "sources": []
+            }
         all_scores = local_scores + [0] * len(web_results)  # Initialize web scores to 0
 
         # Step 4: Perform contextual BM25 scoring

@@ -11,15 +11,28 @@ class ContextualBM25:
         self.avg_doc_length = 0
         self.idf = {}
 
-    def add_document(self, documents: List[str]):
-        self.corpus = [doc.split() for doc in documents]
-        self.doc_lengths = [len(doc) for doc in self.corpus]
-        self.avg_doc_length = sum(self.doc_lengths) / len(self.corpus)
+    def add_documents(self, documents: List[str]):
+        new_docs = [doc.split() for doc in documents if doc.strip()]  # Skip empty documents
+        if not new_docs:
+            print("Warning: No valid documents to add.")
+            return
+
+        self.corpus.extend(new_docs)
+        self.doc_lengths.extend(len(doc) for doc in new_docs)
+        
+        if self.corpus:
+            self.avg_doc_length = sum(self.doc_lengths) / len(self.corpus)
+        else:
+            self.avg_doc_length = 0
+
         self._calculate_idf()
 
     # Calculate IDF for each term in the corpus. IDF is the inverse document frequency of a term, 
     # which measures how important the term is in the corpus. 
     def _calculate_idf(self):
+        if not self.corpus:
+            print("Warning:Corpus is empty. Unbale to calculate IDF")
+            return
         N = len(self.corpus)
         for doc in self.corpus:
             for term in set(doc):
