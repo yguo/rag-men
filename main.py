@@ -1,7 +1,7 @@
 import sys
 import argparse
 from src.pipeline.pipeline import ContextualRAGPipeline
-
+from config import config
 import PyPDF2
 
 def load_file_content(file_path):
@@ -56,6 +56,12 @@ def main():
     parser = argparse.ArgumentParser(description="Contextual RAG Pipeline")
     parser.add_argument('--list_kb', action='store_true', help='List the contents of the knowledge base')
     args = parser.parse_args()
+
+     # Check if SERPAPI_API_KEY is set
+    if not config.get('API', 'SERPAPI_API_KEY'):
+        print("Error: SERPAPI_API_KEY is not set in the configuration.")
+        sys.exit(1)
+
 
     pipeline = ContextualRAGPipeline()
 

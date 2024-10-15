@@ -68,22 +68,33 @@ class ContextualRAGPipeline:
         return success
 
     def process_query(self, query: str) -> Dict:
-        # Step 1: Retrieve relevant local documents
+        # Step 1: Perform web search
+        web_results = self.web_search.search(query)        
+        web_texts = []
+        for result in web_results:
+            if 'description' in result:
+                web_texts.append(result['description'])
+            elif 'body' in result:
+                web_texts.append(result['body'])
+            elif 'title' in result:
+                web_texts.append(result['title'])
+            else:   
+                print(f"Warning: 'snippet' or 'body' or 'title' not found in web result: {result}")
+
+        # Step 2: Retrieve relevant local documents
         query_embedding = self.contextual_embeddings.generate_embeddings([query], "")[0]
         local_results = self.vector_store.query(query_embedding, n_results=20)
         local_texts = local_results['documents'][0]
         local_scores = local_results['distances'][0]
 
-        # Step 2: Perform web search
-        web_results = self.web_search.search(query)
-        web_texts = [result['snippet'] for result in web_results]
-
+      
         # Step 3: Combine local and web results and initialize scores
         all_texts = local_texts + web_texts
         if not all_texts:
             return {
                 "answer": "I'm sorry, but I couldn't find any relevant information to answer your query.",
-                "sources": []
+                "sources": [],
+                "web_texts": web_texts
             }
         all_scores = local_scores + [0] * len(web_results)  # Initialize web scores to 0
 
