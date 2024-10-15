@@ -35,21 +35,22 @@ def load_file_content(file_path):
                 return content, metadata
     except IOError as e:
         print(f"Error reading file: {e}")
-        return None
+        return None, None
     except PyPDF2.errors.PdfReadError as e:
         print(f"Error reading PDF file: {e}")
-        return None
+        return None, None
 
 def list_knowledge_base(pipeline):
     all_docs = pipeline.vector_store.get_all_documents()
     if not all_docs:
         print("The knowledge base is empty.")
     else:
-        print(f"Knowledge Base Contents: {all_docs}")
+        print(f"Knowledge Base Contents: ")
         for i, (doc_id, text) in enumerate(zip(all_docs['ids'], all_docs['documents']), 1):
             print(f"{i}. ID: {doc_id}")
             print(f"   Content: {text[:100]}...")  # Display first 100 characters
             print()
+        print(f"---- End of the Knowledge Base ----")
 
 def main():
     parser = argparse.ArgumentParser(description="Contextual RAG Pipeline")

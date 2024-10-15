@@ -1,5 +1,7 @@
 from typing import List, Dict
-from ..retriever.contextual_embeddings import ContextualEmbeddings
+
+from ..utils.text_chunker import TextChunker
+from ..retriever.contextual_embeddings import ContextualEmbeddings, OllamaEmbeddings
 from ..retriever.contextual_bm25 import ContextualBM25
 from ..search.web_search import WebSearch
 from ..reranker.reranker_base import Reranker
@@ -7,32 +9,52 @@ from ..retriever.vector_store import VectorStore
 from ..generator.answer_generator import AnswerGenerator
 
 class ContextualRAGPipeline:
-    def __init__(self):
-        self.contextual_embeddings = ContextualEmbeddings()
+    def __init__(self):        
+        ollama_provider = OllamaEmbeddings(model_name="llama3.1")
+        self.contextual_embeddings = ContextualEmbeddings(provider=ollama_provider)
         self.contextual_bm25 = ContextualBM25()
         self.web_search = WebSearch()
         self.reranker = Reranker()
         self.vector_store = VectorStore()
         self.answer_generator = AnswerGenerator()
-
-    def add_document(self, text: str,metadata):
+        self.text_chunker = TextChunker()
+    
+    def add_document_chunk(self, chunk: str, metadata: Dict):
         try:
-            embedding = self.contextual_embeddings.generate_embeddings([text], "")[0]
+            embedding = self.contextual_embeddings.generate_embeddings([chunk], "")[0]
             if not embedding:
                 print("Error: No embedding generated to add document. The embedding service might be unavailable.")
                 return False
             # add more metadata 
-            metadata["content_summary"] = text[:100] #placeholder for now
+            chunk_metadata =  metadata.copy()
+            chunk_metadata["content_summary"] = chunk[:100] #placeholder for now
+            chunk_metadata["is_chunk"] = True
+            chunk_metadata["chunk_index"] = metadata.get("chunk_index", 0) 
+
+            self.vector_store.add_documents([chunk], [embedding], [chunk_metadata])
+            self.contextual_bm25.add_documents([chunk])
+            return True
+        except Exception as e:
+            print(f"Error adding document chunk: {e}")
+            return False
 
             self.vector_store.add_documents([text], [embedding], metadata)
-            self.contextual_bm25.add_documents([text])
-        except Exception as e:
-            print(f"Error adding document: {e}")
+
+    def add_document(self, text: str,metadata):
+        chunks = self.text_chunker.chunk_text(text)
+        success = True
+        for i, chunk in enumerate(chunks):
+            chunk_metadata = metadata.copy()
+            chunk_metadata["chunk_index"] = i
+            chunk_metadata["total_chunks"] = len(chunks)
+            if not self.add_document_chunk(chunk, chunk_metadata):
+                success = False
+        return success
 
     def process_query(self, query: str) -> Dict:
         # Step 1: Retrieve relevant local documents
         query_embedding = self.contextual_embeddings.generate_embeddings([query], "")[0]
-        local_results = self.vector_store.query(query_embedding, n_results=5)
+        local_results = self.vector_store.query(query_embedding, n_results=20)
         local_texts = local_results['documents'][0]
         local_scores = local_results['distances'][0]
 
