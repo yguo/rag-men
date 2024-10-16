@@ -55,6 +55,7 @@ def list_knowledge_base(pipeline):
 def main():
     parser = argparse.ArgumentParser(description="Contextual RAG Pipeline")
     parser.add_argument('--list_kb', action='store_true', help='List the contents of the knowledge base')
+    parser.add_argument('--clear_kb', action='store_true', help='Clear the knowledge base')
     args = parser.parse_args()
 
      # Check if SERPAPI_API_KEY is set
@@ -67,6 +68,11 @@ def main():
 
     if args.list_kb:
         list_knowledge_base(pipeline)
+        return
+    
+    if args.clear_kb:
+        pipeline.vector_store.clear_database()
+        print("Knowledge base has been cleared.")
         return
 
     while True:

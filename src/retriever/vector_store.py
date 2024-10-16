@@ -3,8 +3,8 @@ import chromadb
 from chromadb.config import Settings
 
 class VectorStore:
-    def __init__(self, collection_name: str = "local_knowledge_base"):
-        self.client = chromadb.Client(Settings(allow_reset=True))
+    def __init__(self, collection_name: str = "local_knowledge_base", persist_directory: str = "./chroma_db"):
+        self.client = chromadb.PersistentClient(path=persist_directory, settings=Settings(allow_reset=True)) 
         self.collection = self.client.get_or_create_collection(name=collection_name)        
 
     def add_documents(self, texts: list[str], embeddings: list[list[float]], metadata: list[dict] = None, ids: list[str] = None):
@@ -42,3 +42,7 @@ class VectorStore:
     
     def get_document_by_id(self, id: str):
         return self.collection.get(ids=[id])
+    
+    def clear_database(self):
+        self.client.reset()
+        self.collection = self.client.get_or_create_collection(name=self.collection.name)

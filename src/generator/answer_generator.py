@@ -2,7 +2,7 @@ import ollama
 from typing import List, Dict
 
 class AnswerGenerator:
-    def __init__(self, model_name: str = "llama2"):
+    def __init__(self, model_name: str = "llama3"):
         self.model = model_name
 
     def generate_answer(self, query: str, context: str, reranked_results: List[Dict]) -> str:
@@ -10,6 +10,7 @@ class AnswerGenerator:
         
         try:
             response = ollama.generate(model=self.model, prompt=prompt)
+            print (f"DEBUG:prompt: {prompt}")
             return response['response'].strip()
         except Exception as e:
             print(f"Error generating answer: {e}")

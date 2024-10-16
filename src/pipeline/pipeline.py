@@ -15,8 +15,8 @@ class ContextualRAGPipeline:
         self.contextual_bm25 = ContextualBM25()
         self.web_search = WebSearch()
         self.reranker = Reranker()
-        self.vector_store = VectorStore()
-        self.answer_generator = AnswerGenerator()
+        self.vector_store = VectorStore(persist_directory="./chroma_db")
+        self.answer_generator = AnswerGenerator(model_name="llama3.1")
         self.text_chunker = TextChunker()
     
     def add_document_chunk(self, chunk: str, metadata: Dict):
@@ -85,6 +85,7 @@ class ContextualRAGPipeline:
         query_embedding = self.contextual_embeddings.generate_embeddings([query], "")[0]
         local_results = self.vector_store.query(query_embedding, n_results=20)
         local_texts = local_results['documents'][0]
+        print(f"DEBUG: local_texts: {local_texts}\n\n local_results: {local_results}\n\n")
         local_scores = local_results['distances'][0]
 
       
