@@ -163,6 +163,15 @@ graph TD
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the MIT License
 
-[![Yi Guo activity graph](https://github-readme-activity-graph.vercel.app/graph?username=yguo)](https://github.com/yguo/)
+
+## Star History
+
+<a href="https://star-history.com/#yguo/rag-men&Date">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=yguo/rag-men&type=Date&theme=dark" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=yguo/rag-men&type=Date" />
+   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=yguo/rag-men&type=Date" />
+ </picture>
+</a>
