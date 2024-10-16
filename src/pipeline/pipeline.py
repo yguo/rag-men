@@ -42,10 +42,12 @@ class ContextualRAGPipeline:
             chunk_id = f"doc_{metadata.get('file_name', 'unknown')}_{metadata.get('chunk_index', 0)}"
              # Check if the document already exists
             existing_doc = self.vector_store.get_document_by_id(chunk_id)
-            if existing_doc:
+            print(f"DEBUG: existing_doc: {existing_doc}")
+            if existing_doc['ids']:
                 print(f"Document with ID {chunk_id} already exists. Updating...")
                 self.vector_store.update_document(chunk_id, chunk, embedding, chunk_metadata)
             else:
+                print(f"DEBUG: Adding new document with ID {chunk_id}")
                 self.vector_store.add_documents([chunk], [embedding], [chunk_metadata], [chunk_id])
 
             self.contextual_bm25.add_documents([chunk])
@@ -83,9 +85,16 @@ class ContextualRAGPipeline:
 
         # Step 2: Retrieve relevant local documents
         query_embedding = self.contextual_embeddings.generate_embeddings([query], "")[0]
+        print(f"DEBUG: Query embedding shape: {len(query_embedding)}")
         local_results = self.vector_store.query(query_embedding, n_results=20)
-        local_texts = local_results['documents'][0]
-        print(f"DEBUG: local_texts: {local_texts}\n\n local_results: {local_results}\n\n")
+        if local_results['ids'][0]:
+            local_texts = local_results['documents'][0]
+            local_scores = local_results['distances'][0]
+        else:
+            local_texts = []
+            local_scores = []
+        #print(f"DEBUG: local_texts: {local_texts}")
+
         local_scores = local_results['distances'][0]
 
       
@@ -114,9 +123,9 @@ class ContextualRAGPipeline:
             }
             if not result["is_local"]:
                 result.update(web_results[i - len(local_texts)])
-            combined_results.append(result)
-
+            combined_results.append(result)       
         # Step 6: Rerank results
+        # print(f"DEBUG: Combined results structure: {combined_results[:2]}")  # Print first two items for brevity
         reranked_results = self.reranker.rerank(query, " ".join(all_texts), combined_results)
 
         # Step 7: Generate answer

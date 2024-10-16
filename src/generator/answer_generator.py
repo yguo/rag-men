@@ -9,8 +9,7 @@ class AnswerGenerator:
         prompt = self._construct_prompt(query, context, reranked_results)
         
         try:
-            response = ollama.generate(model=self.model, prompt=prompt)
-            print (f"DEBUG:prompt: {prompt}")
+            response = ollama.generate(model=self.model, prompt=prompt)            
             return response['response'].strip()
         except Exception as e:
             print(f"Error generating answer: {e}")

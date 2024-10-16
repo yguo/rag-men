@@ -11,7 +11,7 @@ class Reranker:
             prompt = f"""
             Query: {query}
             Context: {context}
-            Document: {result['description']}
+            Document: {result['text']}
 
             Rate the relevance of this document to the query and context on a scale of 0 to 10, where 0 is completely irrelevant and 10 is highly relevant.
             Only respond with a number between 0 and 10.
@@ -23,7 +23,7 @@ class Reranker:
                     result['relevance_score'] = relevance_score
                     reranked_results.append(result)
                 except ValueError:
-                    print(f"Error parsing relevance score for result: {result['title']}")
+                    print(f"Error parsing relevance score for result: {result.get('text', '')[:20]}")
             except ResponseError as e:
                 print(f"Ollama ResponseError: {e}")
                 print(f"Status code: {e.status_code}")
