@@ -155,9 +155,9 @@ graph TD
 
 ## Future Improvements
 
-- Implement document chunking for handling larger texts
-- Add support for multiple vector stores and LLM providers
-- Improve error handling and logging
+- [x] Implement document chunking for handling larger texts
+- [ ] Add support for multiple vector stores and LLM providers
+- [ ] Improve error handling and logging
 - Develop a web interface for easier interaction
 - Implement caching mechanisms for improved performance
 
