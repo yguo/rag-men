@@ -1,5 +1,6 @@
-from typing import List, Dict
-
+from typing import List, Dict, Tuple
+import numpy as np
+from ..context.context_manager import ContextManager
 from ..utils.text_chunker import TextChunker
 from ..retriever.contextual_embeddings import ContextualEmbeddings, OllamaEmbeddings
 from ..retriever.contextual_bm25 import ContextualBM25
@@ -18,7 +19,49 @@ class ContextualRAGPipeline:
         self.vector_store = VectorStore(persist_directory="./chroma_db")
         self.answer_generator = AnswerGenerator(model_name="llama3.1")
         self.text_chunker = TextChunker()
-    
+
+        self.context_manager = ContextManager()
+        self.context_window_size = 5
+
+    def generate_context(self,query:str) -> str:
+        query_embedding = self.contextual_embeddings.generate_embeddings([query], "")[0]
+            
+        # Get recent contexts
+        recent_contexts = self.context_manager.get_recent_contexts(self.context_window_size - 1)
+        
+        # Calculate relevance scores
+        relevance_scores = self.calculate_relevance_scores(query_embedding, [emb for _, _, emb in recent_contexts])
+        
+        # Generate weighted context
+        weighted_context = self.generate_weighted_context(query, relevance_scores, recent_contexts)
+        
+        return weighted_context
+
+
+    def calculate_relevance_scores(self, current_query_embedding: List[float], historical_embeddings: List[List[float]]) -> List[float]:
+        if not historical_embeddings:
+            return []
+        similarities = [
+            np.dot(current_query_embedding,hist_emb) / (np.linalg.norm(current_query_embedding) * np.linalg.norm(hist_emb))
+            for hist_emb in historical_embeddings
+        ]
+        recent_weights = np.linspace(0.5,1, len(similarities))
+        weighted_similarities = np.array(similarities) * recent_weights
+        return list(weighted_similarities / np.sum(weighted_similarities)) if weighted_similarities.size>  0 else []
+
+    def generate_weighted_context(self, current_query: str, relevance_scores: List[float], recent_contexts: List[Tuple[str, str, List[float]]]) -> str:
+        # Combine historical queries and responses based on their relevance scores
+        weighted_contexts = [
+            f"{score:.2f} * Q: {query} A: {response}"
+            for score, (query, response, _) in zip(relevance_scores, recent_contexts)
+        ]
+        
+        # Add the current query with full weight
+        weighted_contexts.append(f"1.00 * Q: {current_query}")
+        
+        return " | ".join(weighted_contexts)
+
+
     def add_document_chunk(self, chunk: str, metadata: Dict):
         try:
              # Generate a context summary from the metadata
@@ -70,6 +113,9 @@ class ContextualRAGPipeline:
         return success
 
     def process_query(self, query: str) -> Dict:
+        context = self.generate_context(query)
+        print(f"DEBUG: Context: {context}")
+        
         # Step 1: Perform web search
         web_results = self.web_search.search(query)        
         web_texts = []
@@ -129,10 +175,16 @@ class ContextualRAGPipeline:
         reranked_results = self.reranker.rerank(query, " ".join(all_texts), combined_results)
 
         # Step 7: Generate answer
-        context = " ".join([r['text'] for r in reranked_results[:3]])
-        answer = self.answer_generator.generate_answer(query, context, reranked_results[:3])
+        answer = self.answer_generator.generate_answer(query, context, reranked_results)
+
+        # step 8 : store the query and answer in the context manager
+        query_embedding = self.contextual_embeddings.generate_embeddings([query], "")[0]
+        self.context_manager.add_entry(query, answer, query_embedding)
+
 
         return {
             "answer": answer,
             "sources": reranked_results[:5]
         }
+    def __del__(self):
+        self.context_manager.close()
