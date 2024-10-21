@@ -8,6 +8,7 @@ from ..search.web_search import WebSearch
 from ..reranker.reranker_base import Reranker
 from ..retriever.vector_store import VectorStore
 from ..generator.answer_generator import AnswerGenerator
+from ..context.query_processing.query_expander import QueryExpander
 
 class ContextualRAGPipeline:
     def __init__(self):        
@@ -16,9 +17,10 @@ class ContextualRAGPipeline:
         self.contextual_bm25 = ContextualBM25()
         self.web_search = WebSearch()
         self.reranker = Reranker()
-        self.vector_store = VectorStore(persist_directory="./chroma_db")
+        self.vector_store = VectorStore(persist_directory="./chroma_db", embedding_provider=self.contextual_embeddings)
         self.answer_generator = AnswerGenerator(model_name="llama3.1")
         self.text_chunker = TextChunker()
+        self.query_expander = QueryExpander()
 
         self.context_manager = ContextManager()
         self.context_window_size = 5
@@ -70,11 +72,11 @@ class ContextualRAGPipeline:
             context += f"Subject: {metadata.get('subject', 'Unknown')}\n"
             context += f"Chunk {metadata.get('chunk_index', 0)} of {metadata.get('total_chunks', 1)}\n"
 
-            embedding = self.contextual_embeddings.generate_embeddings([chunk], context)[0]
+           # embedding = self.contextual_embeddings.generate_embeddings([chunk], context)[0]
                    
-            if not embedding:
-                print("Error: No embedding generated to add document. The embedding service might be unavailable.")
-                return False
+            #if not embedding:
+             #   print("Error: No embedding generated to add document. The embedding service might be unavailable.")
+            #    return False
             # add more metadata 
             chunk_metadata =  metadata.copy()
             chunk_metadata["content_summary"] = chunk[:100] #placeholder for now
@@ -88,10 +90,10 @@ class ContextualRAGPipeline:
             print(f"DEBUG: existing_doc: {existing_doc}")
             if existing_doc['ids']:
                 print(f"Document with ID {chunk_id} already exists. Updating...")
-                self.vector_store.update_document(chunk_id, chunk, embedding, chunk_metadata)
+                self.vector_store.update_document(chunk_id, chunk, chunk_metadata)
             else:
                 print(f"DEBUG: Adding new document with ID {chunk_id}")
-                self.vector_store.add_documents([chunk], [embedding], [chunk_metadata], [chunk_id])
+                self.vector_store.add_documents([chunk], [chunk_metadata], [chunk_metadata], [chunk_id])
 
             self.contextual_bm25.add_documents([chunk])
             return True
@@ -113,8 +115,11 @@ class ContextualRAGPipeline:
         return success
 
     def process_query(self, query: str) -> Dict:
-        context = self.generate_context(query)
+        expanded_query = self.query_expander.expand_query_with_pos(query)
+        context = self.generate_context(expanded_query)
         print(f"DEBUG: Context: {context}")
+
+        
         
         # Step 1: Perform web search
         web_results = self.web_search.search(query)        
@@ -130,19 +135,13 @@ class ContextualRAGPipeline:
                 print(f"Warning: 'snippet' or 'body' or 'title' not found in web result: {result}")
 
         # Step 2: Retrieve relevant local documents
-        query_embedding = self.contextual_embeddings.generate_embeddings([query], "")[0]
-        print(f"DEBUG: Query embedding shape: {len(query_embedding)}")
-        local_results = self.vector_store.query(query_embedding, n_results=20)
-        if local_results['ids'][0]:
-            local_texts = local_results['documents'][0]
-            local_scores = local_results['distances'][0]
-        else:
-            local_texts = []
-            local_scores = []
-        #print(f"DEBUG: local_texts: {local_texts}")
+        # query_embedding = self.contextual_embeddings.generate_embeddings([query], "")[0]
 
-        local_scores = local_results['distances'][0]
-
+       
+        local_results = self.vector_store.similarity_search(query, context, top_k=20)
+        local_texts = local_results['documents'][0] if local_results['ids'][0] else []
+        local_scores = local_results['distances'][0] if local_results['ids'][0] else []
+       
       
         # Step 3: Combine local and web results and initialize scores
         all_texts = local_texts + web_texts
@@ -154,16 +153,26 @@ class ContextualRAGPipeline:
             }
         all_scores = local_scores + [0] * len(web_results)  # Initialize web scores to 0
 
-        # Step 4: Perform contextual BM25 scoring
+        # Step 4: Perform contextual BM25 scoring on all texts
         self.contextual_bm25.add_documents(all_texts)
-        bm25_scores = self.contextual_bm25.score(query, " ".join(all_texts))
+        bm25_scores = self.contextual_bm25.score(query, context)
 
-        # Step 5: Combine vector similarity and BM25 scores
+        def normalize(scores):
+            min_score = min(scores)
+            max_score = max(scores)
+            return [(score - min_score) / (max_score - min_score) if max_score - min_score > 0 else 0.5 for score in scores]
+        vector_scores = normalize(local_scores + [0] * len(web_texts))
+        bm25_scores = normalize(bm25_scores)
+
+
+
+        # Step 5: Normalize Combine vector similarity and BM25 scores
         combined_results = []
-        for i, (text, vector_score, bm25_score) in enumerate(zip(all_texts, all_scores, bm25_scores)):
+        for i, (text, vector_score, bm25_score) in enumerate(zip(all_texts, vector_scores, bm25_scores)):
             combined_score = (vector_score + bm25_score) / 2
             result = {
                 "text": text,
+                "bm25_score": bm25_score,
                 "combined_score": combined_score,
                 "is_local": i < len(local_texts)
             }
@@ -175,7 +184,7 @@ class ContextualRAGPipeline:
         reranked_results = self.reranker.rerank(query, " ".join(all_texts), combined_results)
 
         # Step 7: Generate answer
-        answer = self.answer_generator.generate_answer(query, context, reranked_results)
+        answer = self.answer_generator.generate_answer(query, context, reranked_results[:3])
 
         # step 8 : store the query and answer in the context manager
         query_embedding = self.contextual_embeddings.generate_embeddings([query], "")[0]

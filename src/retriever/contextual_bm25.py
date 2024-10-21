@@ -59,6 +59,28 @@ class ContextualBM25:
         return scores
                     
 
+    def search(self,query:str, context:str, top_k:int=5) -> List[str]:
+        query_terms = query.lower().split()
+        context_terms = context.lower().split()
+        scores = []
+        for i, doc in enumerate(self.corpus):
+            score = 0
+            for term in query_terms:
+                if term in doc:
+                    tf = doc.count(term)
+                    context_boost = 1 + (context_terms.count(term) / len(context_terms))
+                    numerator = self.idf[term] * tf * (self.k1 + 1) * context_boost
+                    denominator = tf + self.k1 * (1 - self.b + self.b * self.doc_lengths[i] / self.avg_doc_length)                    
+                    score += numerator / denominator
+            scores.append((i,score))
+        # sort the scores in desc and get top k results
+        top_k_results = sorted(scores, key=lambda x: x[1], reverse=True)[:top_k]
+        results = []
+        for doc_id, score in top_k_results:
+            results.append({"text": " ".join(self.corpus[doc_id]), "score": score})
+        return results
+    
+
     def generate_embeddings(self, texts: List[str], context: str) -> List[list[float]]:
         pass
 
