@@ -95,9 +95,6 @@ graph TD
    - Generate comprehensive answers using Ollama
    - Consider both local knowledge and web search results
 
-7. **Command-line Interface**
-   - Interactive mode for querying and managing the knowledge base
-   - Option to list knowledge base contents
 
 ## Implementation Details
 
@@ -129,7 +126,14 @@ graph TD
 - Orchestrates the entire retrieval and generation process
 - Combines local knowledge, web search, and various scoring mechanisms
 
-## Usage
+## User Guide
+
+0. Using virtual environment is recommended.
+```
+python -m venv venv
+source venv/bin/activate
+```
+
 
 1. Install dependencies:
    ```
