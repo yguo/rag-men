@@ -3,6 +3,9 @@ import argparse
 from src.pipeline.pipeline import ContextualRAGPipeline
 from config import config
 import PyPDF2
+import threading
+import signal
+from src.server import run, stop
 
 def load_file_content(file_path):
     try:
@@ -65,7 +68,7 @@ def main():
 
 
     pipeline = ContextualRAGPipeline()
-
+    server_thread = None 
     if args.list_kb:
         list_knowledge_base(pipeline)
         return
@@ -80,7 +83,10 @@ def main():
         print("1. Upload a file (PDF or utf-8 text only): ")
         print("2. Enter a query")
         print("3. List knowledge base")
-        print("4. Exit")
+        print("4. Run the web server")
+        print("5. Stop the web server")
+        print("6. Exit")
+
         
         choice = input("Enter your choice (1/2/3/4): ").strip()
         
@@ -112,11 +118,28 @@ def main():
         
         elif choice == '3':
             list_knowledge_base(pipeline)
-        
         elif choice == '4':
-            print("Exiting the program. Goodbye!")
-            sys.exit(0)
-        
+            if server_thread and server_thread.is_alive():
+                print("Web server is already running.")
+            else:
+                server_thread = threading.Thread(target=run, args=(pipeline,))
+                server_thread.start()
+                print(f"Web server started on port 8777")
+        elif choice == '5':
+            if server_thread and server_thread.is_alive():
+                stop()
+                server_thread.join()
+                print(f"Web server stopped! bye")
+            else:
+                print("Web server is not running.")
+        elif choice == '6':
+            if server_thread and server_thread.is_alive():
+                stop()
+                server_thread.join()
+            print("Exiting the program. Eric says: Goodbye!")
+            sys.exit(0)            
+            
+
         else:
             print("Invalid choice. Please try again.")
 

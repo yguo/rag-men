@@ -5,7 +5,7 @@ from nltk.corpus import wordnet
 
 class QueryExpander:
     def __init__(self, word_vectors_path: str):
-        self.word_vectors = KeyedVectors.load_word2vec_format(word_vectors_path, binary=True)
+        self.word_vectors = KeyedVectors.load_word2vec_format(word_vectors_path, binary=False)
         # Check if nltk components: wordnet, averaged_perceptron_tagger is already downloaded
         try:
             nltk.data.find('corpus/wordnet')
